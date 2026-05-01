@@ -1,6 +1,8 @@
 const https = require("https");
 const fs = require("fs");
 
+const MAX_PAGES = 13;
+
 function log(msg) {
   console.log(`[${new Date().toISOString()}] ${msg}`);
 }
@@ -11,19 +13,21 @@ function loadData(file) {
       const content = JSON.parse(fs.readFileSync(file, "utf8"));
       const items = content.data || [];
       const ids = new Set(items.map(i => i.id));
-      return { items, ids };
+      const cursor = content.lastCursor || "";
+      return { items, ids, cursor };
     }
   } catch {
     log(`Error reading ${file}, starting fresh`);
   }
-  return { items: [], ids: new Set() };
+  return { items: [], ids: new Set(), cursor: "" };
 }
 
-function saveData(items, file) {
+function saveData(items, file, lastCursor) {
   try {
     const output = {
       totalItems: items.length,
       lastUpdate: new Date().toISOString(),
+      lastCursor: lastCursor || null,
       data: items
     };
     fs.writeFileSync(file, JSON.stringify(output, null, 2), "utf8");
@@ -76,7 +80,7 @@ async function fetchBundleDetails(bundleId) {
     const url = `https://catalog.roproxy.com/v1/bundles/${bundleId}/details`;
     const res = await fetchJSON(url);
 
-    if (res.bundleType !== "DynamicHead") return null; // skip non-dynamic heads silently
+    if (res.bundleType !== "DynamicHead") return null;
 
     if (res.items && Array.isArray(res.items)) {
       const mood = res.items.find(i => i.assetType === 78);
@@ -85,7 +89,6 @@ async function fetchBundleDetails(bundleId) {
       }
     }
   } catch (e) {
-    // only log if not a 400 (400 = not a dynamic head bundle, expected)
     if (!e.message.includes("HTTP 400")) {
       log(`Failed to fetch bundle ${bundleId}: ${e.message}`);
     }
@@ -95,15 +98,16 @@ async function fetchBundleDetails(bundleId) {
 
 async function fetchMoods(existingData) {
   const allItems = [];
-  let cursor = "";
+  let cursor = existingData.cursor || "";
   let page = 0;
   let newCount = 0;
   let duplicateCount = 0;
+  let lastCursor = null;
 
   try {
     do {
       page++;
-      log(`Dynamic Heads - Page ${page}`);
+      log(`Dynamic Heads - Page ${page}/${MAX_PAGES}`);
 
       const base = "https://catalog.roproxy.com/v1/search/items/details?bundleTypes=DynamicHead&Limit=30";
       const url = cursor ? `${base}&Cursor=${cursor}` : base;
@@ -133,15 +137,17 @@ async function fetchMoods(existingData) {
       }
 
       cursor = res.nextPageCursor;
+      lastCursor = cursor;
       await new Promise(r => setTimeout(r, 1000));
 
-    } while (cursor && cursor.trim() !== "");
+    } while (cursor && cursor.trim() !== "" && page < MAX_PAGES);
 
   } catch (e) {
     log(`Error fetching moods: ${e.message}`);
   }
 
-  return { items: allItems, newCount, duplicateCount };
+  log(`Stopped at page ${page}/${MAX_PAGES}`);
+  return { items: allItems, newCount, duplicateCount, lastCursor };
 }
 
 async function main() {
@@ -151,15 +157,26 @@ async function main() {
   const existingData = loadData(file);
   const allItems = [...existingData.items];
 
+  if (existingData.cursor) {
+    log(`Resuming from cursor: ${existingData.cursor}`);
+  } else {
+    log("Starting from beginning");
+  }
+
   const result = await fetchMoods(existingData);
   allItems.push(...result.items);
 
   log(`New: ${result.newCount}, Duplicates: ${result.duplicateCount}`);
 
-  const saved = saveData(allItems, file);
+  const saved = saveData(allItems, file, result.lastCursor);
 
   if (saved) {
     log(`✓ mooddata.json: ${allItems.length} items (${result.newCount} new)`);
+    if (result.lastCursor) {
+      log(`Next run will resume from saved cursor`);
+    } else {
+      log(`Reached end of catalog, next run will start from beginning`);
+    }
   } else {
     log("Failed to save mooddata.json");
   }
