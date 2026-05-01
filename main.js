@@ -76,6 +76,8 @@ async function fetchBundleDetails(bundleId) {
     const url = `https://catalog.roproxy.com/v1/bundles/${bundleId}/details`;
     const res = await fetchJSON(url);
 
+    if (res.bundleType !== "DynamicHead") return null; // skip non-dynamic heads silently
+
     if (res.items && Array.isArray(res.items)) {
       const mood = res.items.find(i => i.assetType === 78);
       if (mood) {
@@ -83,7 +85,10 @@ async function fetchBundleDetails(bundleId) {
       }
     }
   } catch (e) {
-    log(`Failed to fetch bundle ${bundleId}: ${e.message}`);
+    // only log if not a 400 (400 = not a dynamic head bundle, expected)
+    if (!e.message.includes("HTTP 400")) {
+      log(`Failed to fetch bundle ${bundleId}: ${e.message}`);
+    }
   }
   return null;
 }
