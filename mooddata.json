@@ -1,1 +1,47 @@
-
+{
+  "totalItems": 8,
+  "lastUpdate": "2026-05-01T11:38:35.618Z",
+  "lastCursor": "14_1_9d3e05ca38b0a1eb1cd800e68dd1ffcb",
+  "data": [
+    {
+      "id": 15938951885,
+      "name": "Silly Fun - Mood",
+      "custom": false
+    },
+    {
+      "id": 10725833199,
+      "name": "Man Face - Mood",
+      "custom": false
+    },
+    {
+      "id": 11308935548,
+      "name": "Check It - Mood",
+      "custom": false
+    },
+    {
+      "id": 10723858600,
+      "name": "Devon - Mood",
+      "custom": false
+    },
+    {
+      "id": 10687293613,
+      "name": "Dylan - Mood",
+      "custom": false
+    },
+    {
+      "id": 10725638029,
+      "name": "Woman Face - Mood",
+      "custom": false
+    },
+    {
+      "id": 10647852134,
+      "name": "DefaultFallBackMood",
+      "custom": false
+    },
+    {
+      "id": 14618207727,
+      "name": "Default Mood",
+      "custom": false
+    }
+  ]
+}
